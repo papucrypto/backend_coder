@@ -1,0 +1,78 @@
+<h1>Menu del carrito de compras</h1>
+
+{{#if cart}}
+    {{#each cart.products}}
+  <ul>
+      <li>
+        <h2>{{this.product.title}}</h2>
+        <p>{{this.product.description}} <p/>
+        <p>Price: {{this.product.price}}</p>
+        <p>Code: {{this.product.code}}</p>
+        <p>Stock: {{this.product.stock}}</p>
+        <p>Cantidad: {{this.quantity}}</p>
+        <p>Categoría: {{this.product.category}}</p>
+      </li>
+  </ul>
+      {{else}}
+      <h3>No hay productos en el carrito todavía</h3>
+    {{/each}}
+{{/if}}
+
+<a href="http://localhost:8080/api/views/products">Ir al menú de productos</a>
+<br>
+<br>
+{{#if cart.products}}
+<button class="purchase" data-id="{{cart._id}}" data-email="{{email}}" data-products="{{serializedProducts}}" >Finalizar compra</button>
+{{/if}}
+
+<script>
+ document.addEventListener('click', async function(e) {
+  if (e.target.matches('.purchase')) {
+    e.preventDefault();
+    const cartId = e.target.getAttribute('data-id');
+    const email = e.target.getAttribute('data-email');
+    let products = JSON.parse(e.target.getAttribute('data-products'));
+
+    if (confirm('¿Estás seguro de que deseas finalizar la compra?')) {
+      try {
+        const response = await fetch(`http://localhost:8080/api/carts/${cartId}/purchase`, {
+          method: 'POST',
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ products: products, email }),
+        });
+
+        if (response.ok) {
+          const res = await response.json();
+
+          console.log(res)
+
+          if(res?.productsNotPurchased){
+            alert("Algunos productos no se han podido agregar a tu pedido, en el carrito podrás ver que cantidad ha quedado por comprar de qué producto.");
+          
+           await fetch(`http://localhost:8080/api/carts/${cartId}`, {
+          method: 'PUT',
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({products: res.productsNotPurchased}),
+        });
+
+        if(res?.tickets.length > 0) {alert(`Sus productos: '${res.tickets.map(p => p.product)}' han sido comprados. Sus tickets son: '${res.tickets.map(p => p.idTicket)}'`);}
+        }else if(res.data){
+          for (let p of res.data) {
+            await fetch(`http://localhost:8080/api/carts/${cartId}/products/${p.idProduct}`, {
+              method: 'DELETE',
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+          alert(`Sus productos: '${res.data.map(p => p.product)}' han sido comprados. Sus tickets son: '${res.data.map(p => p.idTicket)}'`);
+        }
+          window.location.reload();
+        } else {
+          throw new Error('Algo salió mal');
+        }
+      } catch (error) {
+        console.error('Error al finalizar la compra:', error);
+      }
+    }
+  }
+});
+</script>
